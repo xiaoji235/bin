@@ -1,0 +1,18 @@
+{
+  "firmwares": [
+    {
+      "id": "fw-public",
+      "name": "射频网关固件（公开版）",
+      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin/esp8266/%E5%B0%84%E9%A2%91%E7%BD%91%E5%85%B3%E5%9B%BA%E4%BB%B6%EF%BC%88%E5%85%AC%E5%BC%80%E7%89%88%EF%BC%89.bin",
+      "address": "0x0",
+      "md5": "7dbd205e731fc6cbd970b69d04ff2eb1"
+    },
+    {
+      "id": "fw-tuya",
+      "name": "射频网关固件（涂鸦版）",
+      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin/esp8266/%E5%B0%84%E9%A2%91%E7%BD%91%E5%85%B3%E5%9B%BA%E4%BB%B6%EF%BC%88%E6%B6%82%E9%B8%A6%E7%89%88%EF%BC%89.bin",
+      "address": "0x0",
+      "md5": "b597d83aacc1395f908ca7d4f6e7b97"
+    }
+  ]
+}
