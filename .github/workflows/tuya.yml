@@ -1,0 +1,225 @@
+name: Update firmware manifest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'exp8266/tuya/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firmware-manifest
+  cancel-in-progress: true
+
+jobs:
+  build-manifest:
+    runs-on: ubuntu-latest
+
+    # 【硬上限】整个 job 最多 2 分钟，超时 GitHub 直接 kill
+    # 正常情况下 ~30-50s 完成，最坏情况也在 100s 内
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Skip bot-generated commit
+        timeout-minutes: 1
+        id: skip
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if [[ "$MSG" == *"[skip manifest]"* ]]; then
+            echo "skip=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Regenerate firmware.json
+        timeout-minutes: 1
+        if: steps.skip.outputs.skip == 'false'
+        run: |
+          python3 - <<'PY'
+          import os, hashlib, json
+          from urllib.parse import quote
+
+          BASE_DIR  = 'exp8266/tuya'
+          CDN_BASE  = 'https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/exp8266/tuya'
+          OUT_PATH  = os.path.join(BASE_DIR, 'firmware.json')
+
+          def md5_of(path):
+              h = hashlib.md5()
+              with open(path, 'rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          # 1) 先删除旧 firmware.json
+          if os.path.exists(OUT_PATH):
+              os.remove(OUT_PATH)
+
+          # 2) 扫描 *.bin 计算 MD5
+          firmwares = []
+          for fn in sorted(os.listdir(BASE_DIR)):
+              full = os.path.join(BASE_DIR, fn)
+              if not os.path.isfile(full) or not fn.lower().endswith('.bin'):
+                  continue
+              stem = os.path.splitext(fn)[0]
+              firmwares.append({
+                  'id':      stem,
+                  'name':    stem,
+                  'url':     f'{CDN_BASE}/{quote(fn)}',
+                  'address': '0x0',
+                  'md5':     md5_of(full),
+              })
+
+          # 3) 创建并写入新 firmware.json
+          with open(OUT_PATH, 'w', encoding='utf-8', newline='\n') as f:
+              json.dump({'firmwares': firmwares}, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+
+          print(f'Generated {OUT_PATH} with {len(firmwares)} entries')
+          for fw in firmwares:
+              print(f'  - {fw["name"]}  md5={fw["md5"]}')
+          PY
+
+      - name: Commit and push
+        timeout-minutes: 1
+        if: steps.skip.outputs.skip == 'false'
+        id: commit
+        run: |
+          set -u
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add exp8266/tuya/firmware.json
+          if git diff --staged --quiet; then
+            echo "firmware.json 内容无变化，跳过提交"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git commit -m "chore: update firmware manifest [skip manifest]"
+
+          # 关键：所有 git 网络操作加 timeout，防止网络 hang 拖垮 2 分钟上限
+          # 重试 1 次（共 2 次尝试），最坏耗时约 2 × (15+15) + 2s ≈ 62s
+          pushed=false
+          for i in 1 2; do
+            if timeout 15s git pull --rebase --autostash origin main \
+               && timeout 15s git push; then
+              pushed=true
+              break
+            fi
+            echo "Push 失败，第 $i 次重试..."
+            sleep 2
+          done
+
+          if [ "$pushed" = "true" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::Push 最终失败"
+          exit 1
+
+      # 时间预算 40s：清单 purge 串行，bin purge 8 路并发，
+      # 预算耗尽自动跳过剩余，通配兜底最后收尾
+      - name: Purge jsDelivr cache
+        timeout-minutes: 1
+        if: steps.skip.outputs.skip == 'false' && steps.commit.outputs.changed == 'true'
+        env:
+          REPO: xiaoji235/bin
+          REF: main
+          DIR: exp8266/tuya
+          BUDGET: "40"
+        run: |
+          set -uo pipefail
+          START=$(date +%s)
+          time_left() { echo $(( BUDGET - ( $(date +%s) - START ) )); }
+          time_up()   { [ "$(time_left)" -le 0 ]; }
+
+          enc() {
+            python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+          }
+
+          # 单 URL：curl 超时 3s 连接 / 5s 整体，只重试 1 次（总 2 次尝试）
+          # 最坏单 URL 耗时 = 5 + 1 + 5 = 11s
+          purge_one() {
+            local url="$1" attempt
+            for attempt in 1 2; do
+              if curl -sf --connect-timeout 3 --max-time 5 "$url" >/dev/null 2>&1; then
+                return 0
+              fi
+              [ "$attempt" -eq 1 ] && sleep 1
+            done
+            return 1
+          }
+
+          BASE="https://purge.jsdelivr.net/gh/${REPO}@${REF}"
+
+          # 等 2s 让 GitHub commit 对 jsDelivr 可见（正常 1-2s 就够）
+          sleep 2
+
+          # ---- 1) 清单：串行优先清理（前端第一入口）----
+          if purge_one "${BASE}/${DIR}/firmware.json"; then
+            echo "OK   firmware.json"
+          else
+            echo "::warning::purge firmware.json 失败"
+          fi
+
+          # ---- 2) bin：并发 8 路，带软预算保护 ----
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+
+          pids=()
+          idx=0
+          fail=0
+          skip=0
+
+          while IFS= read -r -d '' f; do
+            if time_up; then
+              skip=$((skip + 1))
+              continue
+            fi
+            name=$(basename "$f")
+            url="${BASE}/${DIR}/$(enc "$name")"
+            idx=$((idx + 1))
+            (
+              if purge_one "$url"; then
+                echo "OK   $name" > "$tmp/$idx"
+              else
+                echo "FAIL $name" > "$tmp/$idx"
+              fi
+            ) &
+            pids+=($!)
+            if [ "${#pids[@]}" -ge 8 ]; then
+              wait "${pids[0]}"
+              pids=("${pids[@]:1}")
+            fi
+          done < <(find "$DIR" -maxdepth 1 -type f -iname '*.bin' -print0)
+
+          for p in "${pids[@]}"; do wait "$p"; done
+
+          for r in "$tmp"/*; do
+            [ -f "$r" ] || continue
+            echo "   $(cat "$r")"
+            grep -q '^OK' "$r" || fail=$((fail + 1))
+          done
+
+          # ---- 3) 通配兜底（剩余预算允许才做）----
+          if ! time_up; then
+            if purge_one "${BASE}/${DIR}/*?purge=*"; then
+              echo "OK   通配兜底 ${DIR}/*"
+            else
+              echo "::warning::通配兜底 purge 失败"
+            fi
+          fi
+
+          echo "==> 汇总: fail=$fail skip=$skip, 已用 $(( $(date +%s) - START ))s"
+
+          # purge 失败只记 warning，不让 job 失败（避免连续重跑浪费额度）
+          exit 0
