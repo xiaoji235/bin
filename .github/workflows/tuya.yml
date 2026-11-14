@@ -48,8 +48,8 @@ jobs:
           import os, hashlib, json
           from urllib.parse import quote
 
-          BASE_DIR  = 'exp8266/tuya'
-          CDN_BASE  = 'https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/exp8266/tuya'
+          BASE_DIR  = 'esp8266/tuya'
+          CDN_BASE  = 'https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/esp8266/tuya'
           OUT_PATH  = os.path.join(BASE_DIR, 'firmware.json')
 
           def md5_of(path):
@@ -97,7 +97,7 @@ jobs:
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-          git add exp8266/tuya/firmware.json
+          git add esp8266/tuya/firmware.json
           if git diff --staged --quiet; then
             echo "firmware.json 内容无变化，跳过提交"
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -134,7 +134,7 @@ jobs:
         env:
           REPO: xiaoji235/bin
           REF: main
-          DIR: exp8266/tuya
+          DIR: esp8266/tuya
           BUDGET: "40"
         run: |
           set -uo pipefail
