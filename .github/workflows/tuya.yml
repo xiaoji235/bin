@@ -166,9 +166,17 @@ jobs:
 
           # ---- 1) 清单：串行优先清理（前端第一入口）----
           if purge_one "${BASE}/${DIR}/firmware.json"; then
-            echo "OK   firmware.json"
+            echo "OK   firmware.json (@${REF})"
           else
-            echo "::warning::purge firmware.json 失败"
+            echo "::warning::purge firmware.json (@${REF}) 失败"
+          fi
+
+          # 1b) 不带 ref 的默认分支 URL（jsDelivr 默认分支入口）
+          DEFAULT_MANIFEST="https://purge.jsdelivr.net/gh/${REPO}/${DIR}/firmware.json"
+          if purge_one "$DEFAULT_MANIFEST"; then
+            echo "OK   firmware.json (default)"
+          else
+            echo "::warning::purge firmware.json (default) 失败"
           fi
 
           # ---- 2) bin：并发 8 路，带软预算保护 ----
