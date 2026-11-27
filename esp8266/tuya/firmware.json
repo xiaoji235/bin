@@ -1,11 +1,25 @@
 {
   "firmwares": [
     {
-      "id": "射频网关固件（涂鸦版）",
-      "name": "射频网关固件（涂鸦版）",
-      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/esp8266/tuya/%E5%B0%84%E9%A2%91%E7%BD%91%E5%85%B3%E5%9B%BA%E4%BB%B6%EF%BC%88%E6%B6%82%E9%B8%A6%E7%89%88%EF%BC%89.bin",
+      "id": "射频网关固件（公开版）",
+      "name": "射频网关固件（公开版）",
+      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/esp8266/tuya/%E5%B0%84%E9%A2%91%E7%BD%91%E5%85%B3%E5%9B%BA%E4%BB%B6%EF%BC%88%E5%85%AC%E5%BC%80%E7%89%88%EF%BC%89.bin",
       "address": "0x0",
-      "md5": "b597d83aacc1395f908ca7d46f4e7b97"
+      "md5": "541f2fa9af548def760caa1089996876"
+    },
+    {
+      "id": "射频网关固件（涂鸦版 α）",
+      "name": "射频网关固件（涂鸦版 α）",
+      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/esp8266/tuya/%E5%B0%84%E9%A2%91%E7%BD%91%E5%85%B3%E5%9B%BA%E4%BB%B6%EF%BC%88%E6%B6%82%E9%B8%A6%E7%89%88%20%CE%B1%EF%BC%89.bin",
+      "address": "0x0",
+      "md5": "0799af59e42546265f2b1340309be1fd"
+    },
+    {
+      "id": "转发固件（涂鸦版 β）",
+      "name": "转发固件（涂鸦版 β）",
+      "url": "https://cdn.jsdelivr.net/gh/xiaoji235/bin@main/esp8266/tuya/%E8%BD%AC%E5%8F%91%E5%9B%BA%E4%BB%B6%EF%BC%88%E6%B6%82%E9%B8%A6%E7%89%88%20%CE%B2%EF%BC%89.bin",
+      "address": "0x0",
+      "md5": "66033cdfa550840cde3761ef3c1a1492"
     }
   ]
 }
